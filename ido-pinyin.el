@@ -435,63 +435,68 @@ in package `chinese-pyim-pymap'"
   "将汉字字符串转换为对应的拼音字符串, 如果 `shou-zi-mu' 设置为t,转换仅得到拼音
 首字母字符串。如果 `ignore-duo-yin-zi' 设置为t, 遇到多音字时，只使用第一个拼音。
 其它拼音忽略。"
-  (let (string-list pinyin-list output)
+  (if (find-if (lambda(x)
+				 (> x 255)) string)
+	  ;; 若有中文,则进行替换
+	  (let (string-list pinyin-list output)
 
-    ;; 确保 `pyim-char-table' 已经生成。
-    (unless (pyim-get-char-code ?文)
-      (pyim-make-char-table))
+		;; 确保 `pyim-char-table' 已经生成。
+		(unless (pyim-get-char-code ?文)
+		  (pyim-make-char-table))
 
-    ;; 将string转换为对应char的list
-    (setq string-list (split-string string ""))
-    
-    ;; 删除空字符串
-    (setq string-list (cl-remove-if #'(lambda (x)
-                                        (= (length x) 0)) string-list))
+		;; 将string转换为对应char的list
+		(setq string-list (split-string string ""))
+		
+		;; 删除空字符串
+		(setq string-list (cl-remove-if #'(lambda (x)
+											(= (length x) 0)) string-list))
 
-    ;; 将上述汉字字符串里面的所有汉字转换为与之对应的拼音list。
-    (setq pinyin-list (mapcar (lambda (str)
-                                (cond
-                                 ((> (length str) 1) (list str))
-                                 ((and (> (length str) 0)
-                                       (string-match-p "\\cc" str))
-                                  (or (pyim-get-char-code (string-to-char str)) (list str)))
-                                 ((> (length str) 0) (list str)))) string-list))
+		;; 将上述汉字字符串里面的所有汉字转换为与之对应的拼音list。
+		(setq pinyin-list (mapcar (lambda (str)
+									(cond
+									 ((> (length str) 1) (list str))
+									 ((and (> (length str) 0)
+										   (string-match-p "\\cc" str))
+									  (or (pyim-get-char-code (string-to-char str)) (list str)))
+									 ((> (length str) 0) (list str)))) string-list))
 
-    ;; 通过排列组合的方式将 pinyin-list 转化为拼音字符串列表。
-    (setq output
-          (if ignore-duo-yin-zi
-              (list (mapconcat 'identity
-                               (mapcar
-                                (lambda (x)
-                                  (if shou-zi-mu
-                                      (substring (car x) 0 1)
-                                    (car x))) pinyin-list)
-                               (or separator "")))
-            (cl-remove-duplicates
-             (let ((result '("")))
-               (cl-loop for i in pinyin-list
-                        do (setq result
-                                 (cl-loop for j in i
-                                          append (cl-loop for k in result
-                                                          collect (concat k (if shou-zi-mu (substring j 0 1) j)
-                                                                          (or separator "")))))) result)
-             :test (lambda (x y) (or (null y) (equal x y)))
-             :from-end t)))
+		;; 通过排列组合的方式将 pinyin-list 转化为拼音字符串列表。
+		(setq output
+			  (if ignore-duo-yin-zi
+				  (list (mapconcat 'identity
+								   (mapcar
+									(lambda (x)
+									  (if shou-zi-mu
+										  (substring (car x) 0 1)
+										(car x))) pinyin-list)
+								   (or separator "")))
+				(cl-remove-duplicates
+				 (let ((result '("")))
+				   (cl-loop for i in pinyin-list
+							do (setq result
+									 (cl-loop for j in i
+											  append (cl-loop for k in result
+															  collect (concat k (if shou-zi-mu (substring j 0 1) j)
+																			  (or separator "")))))) result)
+				 :test (lambda (x y) (or (null y) (equal x y)))
+				 :from-end t)))
 
-    ;; 清理多余的拼音连接符，这个处理方式有点hack。需要优化。
-    (setq output (mapcar (lambda (x)
-                           (replace-regexp-in-string
-                            "- " " " x)) output))
-    (setq output (mapcar (lambda (x)
-                           (replace-regexp-in-string
-                            "-$" "" x)) output))
-    (setq output (mapcar (lambda (x)
-                           (replace-regexp-in-string
-                            " -" " " x)) output))
-    ;; 返回字符串或者列表
-    (if return-list
-        output
-      (mapconcat 'identity output " "))))
+		;; 清理多余的拼音连接符，这个处理方式有点hack。需要优化。
+		(setq output (mapcar (lambda (x)
+							   (replace-regexp-in-string
+								"- " " " x)) output))
+		(setq output (mapcar (lambda (x)
+							   (replace-regexp-in-string
+								"-$" "" x)) output))
+		(setq output (mapcar (lambda (x)
+							   (replace-regexp-in-string
+								" -" " " x)) output))
+		;; 返回字符串或者列表
+		(if return-list
+			output
+		  (mapconcat 'identity output " ")))
+	;; 若没中文,不用替换了,直接返回原字符串
+	string))
 
 (defun ido-set-matches-2 (items &optional do-full)
   "Return list of matches in ITEMS."
@@ -590,9 +595,7 @@ in package `chinese-pyim-pymap'"
 (defun ido-set-matches-1-advise (ido-set-matches-1-fn items &optional do-full)
   (let ((l1 (funcall ido-set-matches-1-fn items do-full))
 		(l2 (ido-set-matches-2 items do-full)))
-	(dolist (e l2)
-	  (add-to-list 'l1 e))
-	l1))
+	(append l2 (cl-set-difference l1 l2))))
 
 (advice-add 'ido-set-matches-1 :around #'ido-set-matches-1-advise)
 
