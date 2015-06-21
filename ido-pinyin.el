@@ -254,7 +254,7 @@
     ("qia" "恰洽掐伽袷葜髂")
     ("qian" "前钱千签欠牵浅潜迁谦遣歉纤嵌乾谴铅虔钳骞倩堑黔掮悭芊缱愆荨芡阡佥搴褰肷钎仟犍钤岍箝鬈扦慊椠")
     ("qiang" "枪墙抢腔呛锵跄羌蔷戕襁樯炝蜣嫱锖戗羟镪")
-    ("qiao" "桥悄乔巧侨瞧敲翘俏窍峭锹撬跷憔樵鞘橇诮愀谯荞峤缲硗鞒劁")
+    ("qiao" "壳桥悄乔巧侨瞧敲翘俏窍峭锹撬跷憔樵鞘橇诮愀谯荞峤缲硗鞒劁")
     ("qie" "切且窃怯茄趄妾砌惬伽锲挈郄箧慊")
     ("qin" "亲钦琴侵秦勤芹擒寝覃沁禽噙揿檎锓芩嗪螓衾廑溱吣")
     ("qing" "情请青清轻晴庆倾卿擎顷氢罄蜻磬謦苘圊檠黥鲭氰箐綮")
@@ -431,33 +431,56 @@ in package `chinese-pyim-pymap'"
   "Get the code of the character CHAR"
   (symbol-value (intern-soft (char-to-string char) pyim-char-table)))
 
+(defun dk-pyim-single-hanzi2pinyin (ch &optional shou-zi-mu)
+  "返回中文汉字的拼音,暂不考虑多音字. 如果 `shou-zi-mu' 设置为t,转换仅得到拼音首字母字符串。"
+  (let (str)
+	(typecase ch
+	  (string
+	   (setq str ch)
+	   (setq ch (string-to-char ch)))
+	  (integer
+	   (setq str (string ch))))
+	;; 确保 `pyim-char-table' 已经生成。
+	(unless (pyim-get-char-code ?文)
+	  (pyim-make-char-table))
+	(let ((pinyin-list (or  (pyim-get-char-code  ch)
+							(list str))))
+	  (if shou-zi-mu
+		  (mapcar (lambda (pinyin)
+				  (substring pinyin 0 1))
+				pinyin-list)
+		pinyin-list))))
+
+(defun dk-pyim-hanzi2pinyin (string &optional shou-zi-mu separator)
+  "将汉字字符串转换为对应的拼音字符串, 如果 `shou-zi-mu' 设置为t,转换仅得到拼音首字母字符串。"
+  (if (string-match-p "\\cc" string)
+	  (progn
+		(if separator
+			(setq string (replace-regexp-in-string ".+\\cc" (concat "\\&" separator)
+												   (replace-regexp-in-string "\\cc" (concat separator "\\&") string))))
+		(replace-regexp-in-string "\\cc" (lambda (ch)
+										   (car (dk-pyim-single-hanzi2pinyin ch shou-zi-mu))) string))
+	string))
+
+
 (defun peng-pyim-hanzi2pinyin (string &optional shou-zi-mu separator return-list ignore-duo-yin-zi)
   "将汉字字符串转换为对应的拼音字符串, 如果 `shou-zi-mu' 设置为t,转换仅得到拼音
 首字母字符串。如果 `ignore-duo-yin-zi' 设置为t, 遇到多音字时，只使用第一个拼音。
 其它拼音忽略。"
   (if (string-match-p "\\cc" string)
 	  ;; 若有中文,则进行替换
-	  (let (string-list pinyin-list output)
+	  (let (pinyin-list output)
 
 		;; 确保 `pyim-char-table' 已经生成。
 		(unless (pyim-get-char-code ?文)
 		  (pyim-make-char-table))
 
-		;; 将string转换为对应char的list
-		(setq string-list (split-string string ""))
-		
-		;; 删除空字符串
-		(setq string-list (cl-remove-if #'(lambda (x)
-											(= (length x) 0)) string-list))
-
 		;; 将上述汉字字符串里面的所有汉字转换为与之对应的拼音list。
-		(setq pinyin-list (mapcar (lambda (str)
+		(setq pinyin-list (mapcar (lambda (ch)
 									(cond
-									 ((> (length str) 1) (list str))
-									 ((and (> (length str) 0)
-										   (string-match-p "\\cc" str))
-									  (or (pyim-get-char-code (string-to-char str)) (list str)))
-									 ((> (length str) 0) (list str)))) string-list))
+									 ((> ch 255)
+									  (or (pyim-get-char-code  ch) (list (string ch))))
+									 (t (list (string ch))))) string))
 
 		;; 通过排列组合的方式将 pinyin-list 转化为拼音字符串列表。
 		(setq output
@@ -497,98 +520,101 @@ in package `chinese-pyim-pymap'"
 	;; 若没中文,不用替换了,直接返回原字符串
 	string))
 
+(defvar hanzi2pinyin-fn 'dk-pyim-hanzi2pinyin
+  "转换汉字为拼音的函数,用于ido-set-matches中作为匹配项的转换")
+
 (defun ido-set-matches-2 (items &optional do-full)
   "Return list of matches in ITEMS."
   (let* ((case-fold-search  ido-case-fold)
-	 (slash (and (not ido-enable-prefix) (ido-final-slash ido-text)))
-	 (text (if slash (substring ido-text 0 -1) ido-text))
-	 (rex0 (if ido-enable-regexp text (regexp-quote text)))
-	 (rexq (concat rex0 (if slash ".*/" "")))
-	 (re (if ido-enable-prefix (concat "\\`" rexq) rexq))
-	 (full-re (and do-full
-		       (not (and (eq ido-cur-item 'buffer)
-				 ido-buffer-disable-smart-matches))
-		       (not ido-enable-regexp)
-		       (not (string-match "\$\\'" rex0))
-		       (concat "\\`" rex0 (if slash "/" "") "\\'")))
-	 (suffix-re (and do-full slash
-			 (not (and (eq ido-cur-item 'buffer)
-				   ido-buffer-disable-smart-matches))
-			 (not ido-enable-regexp)
-			 (not (string-match "\$\\'" rex0))
-			 (concat rex0 "/\\'")))
-	 (prefix-re (and full-re (not ido-enable-prefix)
-			 (concat "\\`" rexq)))
-	 (non-prefix-dot (or (not ido-enable-dot-prefix)
-			     (not ido-process-ignore-lists)
-			     ido-enable-prefix
-			     (= (length ido-text) 0)))
-	 full-matches suffix-matches prefix-matches matches)
-    (setq ido-incomplete-regexp nil)
+		 (slash (and (not ido-enable-prefix) (ido-final-slash ido-text)))
+		 (text (if slash (substring ido-text 0 -1) ido-text))
+		 (rex0 (if ido-enable-regexp text (regexp-quote text)))
+		 (rexq (concat rex0 (if slash ".*/" "")))
+		 (re (if ido-enable-prefix (concat "\\`" rexq) rexq))
+		 (full-re (and do-full
+					   (not (and (eq ido-cur-item 'buffer)
+								 ido-buffer-disable-smart-matches))
+					   (not ido-enable-regexp)
+					   (not (string-match "\$\\'" rex0))
+					   (concat "\\`" rex0 (if slash "/" "") "\\'")))
+		 (suffix-re (and do-full slash
+						 (not (and (eq ido-cur-item 'buffer)
+								   ido-buffer-disable-smart-matches))
+						 (not ido-enable-regexp)
+						 (not (string-match "\$\\'" rex0))
+						 (concat rex0 "/\\'")))
+		 (prefix-re (and full-re (not ido-enable-prefix)
+						 (concat "\\`" rexq)))
+		 (non-prefix-dot (or (not ido-enable-dot-prefix)
+							 (not ido-process-ignore-lists)
+							 ido-enable-prefix
+							 (= (length ido-text) 0)))
+		 full-matches suffix-matches prefix-matches matches)
+	(setq ido-incomplete-regexp nil)
 
-    (condition-case error
+	(condition-case error
 
-        (mapc
-         (lambda (item)
-           (let ((name (peng-pyim-hanzi2pinyin (ido-name item))))     ;modified
-	     (if (and (or non-prefix-dot
-			  (if (= (aref ido-text 0) ?.)
-			      (= (aref name 0) ?.)
-			    (/= (aref name 0) ?.)))
-		      (string-match re name))
-		 (cond
-		  ((and (eq ido-cur-item 'buffer)
-			(or (not (stringp ido-default-item))
-			    (not (string= name ido-default-item)))
-			(string= name (buffer-name ido-entry-buffer)))
-		   (setq matches (cons item matches)))
-		  ((and full-re (string-match full-re name))
-		   (setq full-matches (cons item full-matches)))
-		  ((and suffix-re (string-match suffix-re name))
-		   (setq suffix-matches (cons item suffix-matches)))
-		  ((and prefix-re (string-match prefix-re name))
-		   (setq prefix-matches (cons item prefix-matches)))
-		  (t (setq matches (cons item matches))))))
-	   t)
-         items)
+		(mapc
+		 (lambda (item)
+		   (let ((name (funcall hanzi2pinyin-fn (ido-name item))))     ;modified
+			 (if (and (or non-prefix-dot
+						  (if (= (aref ido-text 0) ?.)
+							  (= (aref name 0) ?.)
+							(/= (aref name 0) ?.)))
+					  (string-match re name))
+				 (cond
+				  ((and (eq ido-cur-item 'buffer)
+						(or (not (stringp ido-default-item))
+							(not (string= name ido-default-item)))
+						(string= name (buffer-name ido-entry-buffer)))
+				   (setq matches (cons item matches)))
+				  ((and full-re (string-match full-re name))
+				   (setq full-matches (cons item full-matches)))
+				  ((and suffix-re (string-match suffix-re name))
+				   (setq suffix-matches (cons item suffix-matches)))
+				  ((and prefix-re (string-match prefix-re name))
+				   (setq prefix-matches (cons item prefix-matches)))
+				  (t (setq matches (cons item matches))))))
+		   t)
+		 items)
 
-      (invalid-regexp
-       (setq ido-incomplete-regexp t
-             ;; Consider the invalid regexp message internally as a
-             ;; special-case single match, and handle appropriately
-             ;; elsewhere.
-             matches (cdr error))))
+	  (invalid-regexp
+	   (setq ido-incomplete-regexp t
+			 ;; Consider the invalid regexp message internally as a
+			 ;; special-case single match, and handle appropriately
+			 ;; elsewhere.
+			 matches (cdr error))))
 
-    (when prefix-matches
-      (ido-trace "prefix match" prefix-matches)
-      ;; Bug#2042.
-      (setq matches (nconc prefix-matches matches)))
-    (when suffix-matches
-      (ido-trace "suffix match" (list text suffix-re suffix-matches))
-      (setq matches (nconc suffix-matches matches)))
-    (when full-matches
-      (ido-trace "full match" (list text full-re full-matches))
-      (setq matches (nconc full-matches matches)))
+	(when prefix-matches
+	  (ido-trace "prefix match" prefix-matches)
+	  ;; Bug#2042.
+	  (setq matches (nconc prefix-matches matches)))
+	(when suffix-matches
+	  (ido-trace "suffix match" (list text suffix-re suffix-matches))
+	  (setq matches (nconc suffix-matches matches)))
+	(when full-matches
+	  (ido-trace "full match" (list text full-re full-matches))
+	  (setq matches (nconc full-matches matches)))
 
-    (when (and (null matches)
-	       ido-enable-flex-matching
-	       (> (length ido-text) 1)
-	       (not ido-enable-regexp))
-      (setq re (concat (regexp-quote (string (aref ido-text 0)))
-		       (mapconcat (lambda (c)
-				    (concat "[^" (string c) "]*"
-					    (regexp-quote (string c))))
-				  (substring ido-text 1) "")))
-      (if ido-enable-prefix
-	  (setq re (concat "\\`" re)))
-      (mapc
-       (lambda (item)
-	 (let ((name (peng-pyim-hanzi2pinyin (ido-name item))))     ;modified
-	   (if (string-match re name)
-	       (setq matches (cons item matches)))))
-       items))
+	(when (and (null matches)
+			   ido-enable-flex-matching
+			   (> (length ido-text) 1)
+			   (not ido-enable-regexp))
+	  (setq re (concat (regexp-quote (string (aref ido-text 0)))
+					   (mapconcat (lambda (c)
+									(concat "[^" (string c) "]*"
+											(regexp-quote (string c))))
+								  (substring ido-text 1) "")))
+	  (if ido-enable-prefix
+		  (setq re (concat "\\`" re)))
+	  (mapc
+	   (lambda (item)
+		 (let ((name (funcall hanzi2pinyin-fn (ido-name item))))     ;modified
+		   (if (string-match re name)
+			   (setq matches (cons item matches)))))
+	   items))
 
-    (delete-consecutive-dups matches t)))
+	(delete-consecutive-dups matches t)))
 
 
 (defun ido-set-matches-1-advise (ido-set-matches-1-fn items &optional do-full)
@@ -599,3 +625,4 @@ in package `chinese-pyim-pymap'"
 (advice-add 'ido-set-matches-1 :around #'ido-set-matches-1-advise)
 
 (provide 'ido-pinyin)
+
