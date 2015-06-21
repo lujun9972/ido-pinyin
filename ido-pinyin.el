@@ -493,7 +493,7 @@ in package `chinese-pyim-pymap'"
         output
       (mapconcat 'identity output " "))))
 
-(defun ido-set-matches-1 (items &optional do-full)
+(defun ido-set-matches-2 (items &optional do-full)
   "Return list of matches in ITEMS."
   (let* ((case-fold-search  ido-case-fold)
 	 (slash (and (not ido-enable-prefix) (ido-final-slash ido-text)))
@@ -585,5 +585,13 @@ in package `chinese-pyim-pymap'"
        items))
 
     (delete-consecutive-dups matches t)))
+
+
+(defun ido-set-matches-1-advise (ido-set-matches-1-fn items &optional do-full)
+  (let ((l1 (funcall ido-set-matches-1-fn items do-full))
+		(l2 (ido-set-matches-2 items do-full)))
+	(append l1 l2)))
+
+(advice-add 'ido-set-matches-1 :around #'ido-set-matches-1-advise)
 
 (provide 'ido-pinyin)
