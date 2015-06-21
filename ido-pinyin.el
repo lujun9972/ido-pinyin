@@ -435,8 +435,7 @@ in package `chinese-pyim-pymap'"
   "将汉字字符串转换为对应的拼音字符串, 如果 `shou-zi-mu' 设置为t,转换仅得到拼音
 首字母字符串。如果 `ignore-duo-yin-zi' 设置为t, 遇到多音字时，只使用第一个拼音。
 其它拼音忽略。"
-  (if (find-if (lambda(x)
-				 (> x 255)) string)
+  (if (string-match-p "\\cc" string)
 	  ;; 若有中文,则进行替换
 	  (let (string-list pinyin-list output)
 
