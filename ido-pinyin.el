@@ -1,6 +1,6 @@
 (require 'cl-lib)
 
-(defvar pyim-pinyin-pymap
+(setq pyim-pinyin-pymap
   '(("a" "阿啊呵腌嗄锕吖")
     ("ai" "爱哀挨碍埃癌艾唉矮哎皑蔼隘暧霭捱嗳瑷嫒锿嗌砹")
     ("an" "安案按暗岸俺谙黯鞍氨庵桉鹌胺铵揞犴埯")
@@ -455,9 +455,9 @@ in package `chinese-pyim-pymap'"
   "将汉字字符串转换为对应的拼音字符串, 如果 `shou-zi-mu' 设置为t,转换仅得到拼音首字母字符串。"
   (if (string-match-p "\\cc" string)
 	  (progn
-		(if separator
-			(setq string (replace-regexp-in-string ".+\\cc" (concat "\\&" separator)
-												   (replace-regexp-in-string "\\cc" (concat separator "\\&") string))))
+		(when separator
+		  (setq string (concat (substring string 0 1)
+							   (replace-regexp-in-string "\\cc" (concat separator "\\&") (substring string 1)))))
 		(replace-regexp-in-string "\\cc" (lambda (ch)
 										   (car (dk-pyim-single-hanzi2pinyin ch shou-zi-mu))) string))
 	string))
