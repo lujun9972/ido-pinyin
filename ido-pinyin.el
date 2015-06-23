@@ -452,7 +452,9 @@ in package `chinese-pyim-pymap'"
 		pinyin-list))))
 
 (defun dk-pyim-hanzi2pinyin (string &optional shou-zi-mu separator)
-  "将汉字字符串转换为对应的拼音字符串, 如果 `shou-zi-mu' 设置为t,转换仅得到拼音首字母字符串。"
+  "将汉字字符串转换为对应的拼音字符串, 如果 `shou-zi-mu' 设置为t,转换仅得到拼音首字母字符串。
+
+如果待转换的字符串中无要转换的 汉字,则返回空字符串"
   (if (string-match-p "\\cc" string)
 	  (progn
 		(when separator
@@ -460,7 +462,7 @@ in package `chinese-pyim-pymap'"
 							   (replace-regexp-in-string "\\cc" (concat separator "\\&") (substring string 1)))))
 		(replace-regexp-in-string "\\cc" (lambda (ch)
 										   (car (dk-pyim-single-hanzi2pinyin ch shou-zi-mu))) string))
-	string))
+	""))
 
 
 (defun peng-pyim-hanzi2pinyin (string &optional shou-zi-mu separator return-list ignore-duo-yin-zi)
@@ -620,7 +622,7 @@ in package `chinese-pyim-pymap'"
 (defun ido-set-matches-1-advise (ido-set-matches-1-fn items &optional do-full)
   (let ((l1 (funcall ido-set-matches-1-fn items do-full))
 		(l2 (ido-set-matches-2 items do-full)))
-	(append l2 (cl-set-difference l1 l2))))
+	(append l2 l1)))
 
 (advice-add 'ido-set-matches-1 :around #'ido-set-matches-1-advise)
 
