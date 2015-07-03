@@ -19,6 +19,6 @@
   
   我是直接使用 [[https://github.com/pengpengxp/ido-pinyin][chinese-pyim]] 中的函数来将中文转换成拼音的。
 * 安装
-  下载以后将ido-pinyin.el放到exec-path目录中,再`(require 'ido-pinyin)'即可
+  下载以后将ido-pinyin.el放到load-path目录中,再`(require 'ido-pinyin)'即可
 * TODO 还需要改进的地方
   - 输入一部分中文拼音,一部分中文的情况下无法匹配
