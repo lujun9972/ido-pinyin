@@ -621,7 +621,9 @@ in package `chinese-pyim-pymap'"
 
 (defun ido-set-matches-1-advise (ido-set-matches-1-fn items &optional do-full)
   (let ((l1 (funcall ido-set-matches-1-fn items do-full))
-		(l2 (ido-set-matches-2 items do-full)))
+		l2 )
+	(unless (string= "" ido-text)
+	  (setq l2 (ido-set-matches-2 items do-full)))
 	(append l2 l1)))
 
 (advice-add 'ido-set-matches-1 :around #'ido-set-matches-1-advise)
